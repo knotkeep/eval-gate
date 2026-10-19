@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+      - run: uv sync --all-groups --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+
+  # Runs the action itself on the example runs and checks both verdicts.
+  action:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unchanged candidate
+        id: ok
+        uses: ./
+        with:
+          candidate: examples/candidate-ok.jsonl
+          baseline: examples/baseline-night1.jsonl examples/baseline-night2.jsonl examples/baseline-night3.jsonl
+          config: examples/gate.yaml
+          title: Self-test, unchanged candidate
+          comment: "false"
+      - name: Regressed candidate
+        id: bad
+        continue-on-error: true
+        uses: ./
+        with:
+          candidate: examples/candidate-regressed.jsonl
+          baseline: examples/baseline-night1.jsonl examples/baseline-night2.jsonl examples/baseline-night3.jsonl
+          config: examples/gate.yaml
+          title: Self-test, regressed candidate
+          comment: "false"
+      - name: Check verdicts
+        env:
+          OK: ${{ steps.ok.outputs.verdict }}
+          BAD: ${{ steps.bad.outputs.verdict }}
+          BAD_CODE: ${{ steps.bad.outputs.exit-code }}
+          BAD_OUTCOME: ${{ steps.bad.outcome }}
+        run: |
+          echo "unchanged=$OK regressed=$BAD ($BAD_CODE, step $BAD_OUTCOME)"
+          test "$OK" = pass && test "$BAD" = floor && test "$BAD_CODE" = 2 && test "$BAD_OUTCOME" = failure

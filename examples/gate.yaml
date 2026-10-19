@@ -1,0 +1,15 @@
+# Gate for a 100-case golden set: 60 happy path, 20 edge, 10 refusal, 10 historical failures.
+alpha: 0.05          # one-sided significance for a drop in pass rate
+margin: 0.10         # a clean pass must rule out a drop larger than 10 points; one run of
+                     # 100 cases has an interval about +/-5 points wide, so 5 would warn on most runs
+min_cases: 50
+max_error_rate: 0.05
+inconclusive: warn
+floors:
+  overall: 0.85
+  slices:
+    refusal: 1.0
+    historical: 1.0
+metrics:
+  latency_s:
+    max_increase: 0.25

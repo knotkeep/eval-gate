@@ -1,0 +1,97 @@
+name: eval-gate
+description: Gate an agent evaluation run against a baseline with floors and paired statistical tests; report on the PR.
+inputs:
+  candidate:
+    description: Candidate results files (JSONL), space-separated.
+    required: true
+  baseline:
+    description: Baseline results files (JSONL), space-separated; several files pool as trials. Empty means floors only.
+    required: false
+    default: ""
+  config:
+    description: Path to gate.yaml.
+    required: false
+    default: ""
+  title:
+    description: Report heading; also identifies the PR comment that later runs update.
+    required: false
+    default: Eval gate
+  comment:
+    description: Post or update a PR comment on pull_request events (true/false).
+    required: false
+    default: "true"
+  github-token:
+    description: Token for the PR comment (needs pull-requests write).
+    required: false
+    default: ${{ github.token }}
+outputs:
+  verdict:
+    description: pass, regression, floor, inconclusive or error.
+    value: ${{ steps.gate.outputs.verdict }}
+  exit-code:
+    description: 0 pass, 1 regression, 2 floor, 3 inconclusive, 4 error.
+    value: ${{ steps.gate.outputs.exit-code }}
+  report:
+    description: Path to the markdown report.
+    value: ${{ steps.gate.outputs.report }}
+runs:
+  using: composite
+  steps:
+    - name: Install uv when missing
+      shell: bash
+      run: command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Compare
+      id: gate
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        CANDIDATE: ${{ inputs.candidate }}
+        BASELINE: ${{ inputs.baseline }}
+        CONFIG: ${{ inputs.config }}
+        TITLE: ${{ inputs.title }}
+      run: |
+        export PATH="$HOME/.local/bin:$PATH"
+        out="${RUNNER_TEMP:-/tmp}/eval-gate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+        mkdir -p "$out"
+        args=(compare --title "$TITLE" --markdown "$out/report.md" --json "$out/verdict.json" --github-output)
+        read -r -a cand <<< "$CANDIDATE"
+        args+=(--candidate "${cand[@]}")
+        if [ -n "$BASELINE" ]; then read -r -a base <<< "$BASELINE"; args+=(--baseline "${base[@]}"); fi
+        if [ -n "$CONFIG" ]; then args+=(--config "$CONFIG"); fi
+        set +e
+        uv run --quiet --frozen --no-dev --project "$ACTION_PATH" evalgate "${args[@]}"
+        code=$?
+        set -e
+        # A crash before the CLI wrote its outputs still reports as an error.
+        grep -q '^exit-code=' "$GITHUB_OUTPUT" || echo "verdict=error" >> "$GITHUB_OUTPUT"
+        grep -q '^exit-code=' "$GITHUB_OUTPUT" || echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        echo "report=$out/report.md" >> "$GITHUB_OUTPUT"
+        [ -f "$out/report.md" ] && cat "$out/report.md" >> "$GITHUB_STEP_SUMMARY"
+        exit 0
+
+    - name: Comment on the pull request
+      if: github.event_name == 'pull_request' && inputs.comment == 'true' && steps.gate.outputs.report != ''
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPORT: ${{ steps.gate.outputs.report }}
+        PR: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+      run: |
+        [ -f "$REPORT" ] || exit 0
+        marker=$(head -n 1 "$REPORT")
+        # Update this gate's earlier comment in place instead of adding a new one per push.
+        id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+          --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | tail -n 1)
+        if [ -n "$id" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$REPORT" >/dev/null
+        else
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$REPORT" >/dev/null
+        fi
+
+    - name: Exit with the verdict
+      shell: bash
+      env:
+        CODE: ${{ steps.gate.outputs.exit-code }}
+      run: exit "${CODE:-4}"
