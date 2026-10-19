@@ -167,3 +167,16 @@ def test_cli_exit_codes_and_report(tmp_path, cfg):
     assert text.startswith(marker("Golden set")) and "REGRESSION" in text and "`case-040`" in text
     assert json.loads(js.read_text())["status"] == "regression"
     assert main(["compare", "--candidate", str(tmp_path / "missing.jsonl")]) == 4
+
+
+def test_score_field_gates_another_verdict_and_skips_records_without_it(tmp_path):
+    rows = [
+        {"case_id": f"c{i}", "slice": "s", "passed": True, "judge_passed": i != 3}
+        for i in range(30)
+    ]
+    rows.append({"case_id": "seed", "slice": "s", "passed": True})
+    (tmp_path / "r.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    rules = load([tmp_path / "r.jsonl"])
+    judges = load([tmp_path / "r.jsonl"], field="judge_passed")
+    assert len(rules.cases) == 31 and len(judges.cases) == 30
+    assert judges.cases["c3"].scores == [0.0] and rules.cases["c3"].scores == [1.0]

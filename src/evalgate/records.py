@@ -3,7 +3,9 @@
     {"case_id": "claim_status-003", "slice": "happy", "passed": true,
      "metrics": {"latency_s": 3.2, "cost_usd": 0.0}, "error": null}
 
-`passed` may be a boolean or a score in [0, 1] (`score` is accepted as an alias). A record with a
+`passed` may be a boolean or a score in [0, 1] (`score` is accepted as an alias). Another field can
+be gated instead (`field`, for example a judge's verdict stored next to the rule-based one); records
+without that field are skipped entirely, so a view can cover a subset of the cases. A record with a
 non-empty `error` is an infrastructure failure (timeout, server error): it is counted and reported
 but left out of every pass rate, so a flaky model server cannot pass as an agent regression.
 Several trials of a case are several records with the same `case_id`.
@@ -48,16 +50,16 @@ class ResultSet:
         return self.errors / self.records if self.records else 0.0
 
 
-def _score(rec: dict[str, Any], where: str) -> float:
-    raw = rec.get("passed", rec.get("score"))
+def _score(rec: dict[str, Any], where: str, field: str) -> float:
+    raw = rec.get("passed", rec.get("score")) if field == "passed" else rec.get(field)
     if isinstance(raw, bool):
         return float(raw)
     if isinstance(raw, int | float) and 0.0 <= raw <= 1.0:
         return float(raw)
-    raise RecordError(f"{where}: 'passed' must be a boolean or a number in [0, 1], got {raw!r}")
+    raise RecordError(f"{where}: {field!r} must be a boolean or a number in [0, 1], got {raw!r}")
 
 
-def load(paths: list[str | Path]) -> ResultSet:
+def load(paths: list[str | Path], field: str = "passed") -> ResultSet:
     """Merge one or more JSONL files; repeated case IDs become extra trials."""
     cases: dict[str, Case] = {}
     records = errors = 0
@@ -76,6 +78,8 @@ def load(paths: list[str | Path]) -> ResultSet:
             cid = rec.get("case_id")
             if not isinstance(cid, str) or not cid:
                 raise RecordError(f"{where}: missing case_id")
+            if field != "passed" and field not in rec and not rec.get("error"):
+                continue
             sl = str(rec.get("slice") or "all")
             case = cases.setdefault(cid, Case(cid, sl))
             if case.slice != sl:
@@ -85,7 +89,7 @@ def load(paths: list[str | Path]) -> ResultSet:
                 case.errors += 1
                 errors += 1
                 continue
-            case.scores.append(_score(rec, where))
+            case.scores.append(_score(rec, where, field))
             for k, v in (rec.get("metrics") or {}).items():
                 if isinstance(v, int | float) and not isinstance(v, bool):
                     case.metrics[k].append(float(v))

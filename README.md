@@ -47,7 +47,9 @@ uv run evalgate validate results.jsonl
 {"case_id": "claim_status-003", "slice": "happy", "passed": true, "metrics": {"latency_s": 3.2, "cost_usd": 0.0}}
 ```
 
-- `passed`: boolean, or a score in [0, 1].
+- `passed`: boolean, or a score in [0, 1]. `score-field` (CLI `--score-field`) gates another
+  field instead, such as a judge's verdict stored next to the rule-based one; records without that
+  field are skipped, so a second view can cover a subset of cases from the same files.
 - `slice`: any label (for example happy, edge, refusal, historical); floors can apply per slice.
 - `metrics`: optional numbers compared with Welch's t-test; limits are optional.
 - `error`: set it (any non-empty value) when the run failed for infrastructure reasons. Errored

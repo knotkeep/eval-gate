@@ -15,8 +15,8 @@ from evalgate.report import markdown, to_json
 def _compare(args: argparse.Namespace) -> int:
     try:
         cfg = load_config(args.config)
-        candidate = load(args.candidate)
-        baseline = load(args.baseline) if args.baseline else None
+        candidate = load(args.candidate, args.score_field)
+        baseline = load(args.baseline, args.score_field) if args.baseline else None
     except (RecordError, ValueError, OSError) as e:
         print(f"evalgate: {e}", file=sys.stderr)
         return EXIT["error"]
@@ -53,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--baseline", nargs="*", default=[], help="baseline results; pooled as trials")
     c.add_argument("--config", default=None, help="gate.yaml")
     c.add_argument("--title", default="Eval gate")
+    c.add_argument("--score-field", default="passed", help="record field to gate on")
     c.add_argument("--markdown", default=None, help="write the report here")
     c.add_argument("--json", default=None, help="write the verdict as JSON here")
     c.add_argument("--github-output", action="store_true", help="append outputs to $GITHUB_OUTPUT")

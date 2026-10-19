@@ -12,6 +12,10 @@ inputs:
     description: Path to gate.yaml.
     required: false
     default: ""
+  score-field:
+    description: Record field to gate on; records without it are skipped (default passed).
+    required: false
+    default: passed
   title:
     description: Report heading; also identifies the PR comment that later runs update.
     required: false
@@ -50,11 +54,12 @@ runs:
         BASELINE: ${{ inputs.baseline }}
         CONFIG: ${{ inputs.config }}
         TITLE: ${{ inputs.title }}
+        SCORE_FIELD: ${{ inputs.score-field }}
       run: |
         export PATH="$HOME/.local/bin:$PATH"
         out="${RUNNER_TEMP:-/tmp}/eval-gate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
         mkdir -p "$out"
-        args=(compare --title "$TITLE" --markdown "$out/report.md" --json "$out/verdict.json" --github-output)
+        args=(compare --title "$TITLE" --score-field "$SCORE_FIELD" --markdown "$out/report.md" --json "$out/verdict.json" --github-output)
         read -r -a cand <<< "$CANDIDATE"
         args+=(--candidate "${cand[@]}")
         if [ -n "$BASELINE" ]; then read -r -a base <<< "$BASELINE"; args+=(--baseline "${base[@]}"); fi
