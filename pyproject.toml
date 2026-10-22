@@ -1,6 +1,8 @@
 [project]
-name = "evalgate"
-version = "0.1.0"
+# The import package and CLI are `evalgate`; the distribution name avoids an unrelated public
+# PyPI package called evalgate, so no environment can install the wrong one by name.
+name = "knotkeep-evalgate"
+version = "1.1.1"
 description = "Statistical CI gate for agent evaluations: floors, paired regression tests, PR report"
 readme = "README.md"
 requires-python = ">=3.12"

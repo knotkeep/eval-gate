@@ -122,6 +122,12 @@ for cases that must never break, and the broke list names every stable case that
 The repo is private. Callers in the knotkeep organization need this repo's Settings, Actions,
 General, Access set to "Accessible from repositories in the knotkeep organization".
 
+## Packaging
+
+The distribution is `knotkeep-evalgate`; the import package and the CLI are `evalgate`. An unrelated
+package named `evalgate` exists on PyPI, so install this one from its wheel or this repository,
+never by the bare name.
+
 ## Development
 
 ```bash
