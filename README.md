@@ -117,10 +117,9 @@ Measured by simulation on 100 cases (85% stable at 97%, 15% flaky at 30-80%), on
 for cases that must never break, and the broke list names every stable case that failed.
 `tests/test_stats.py` checks the false-alarm rate and the effect of pooling.
 
-## Using it from other private repos
+## Versions
 
-The repo is private. Callers in the knotkeep organization need this repo's Settings, Actions,
-General, Access set to "Accessible from repositories in the knotkeep organization".
+`@v1` follows the latest 1.x release; pin a full tag such as `@v1.1.2` for a fixed version.
 
 ## Packaging
 
@@ -135,3 +134,7 @@ uv sync --all-groups
 uv run pytest
 uv run python examples/make_examples.py   # regenerate the example runs
 ```
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
